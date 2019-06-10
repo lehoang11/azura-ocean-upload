@@ -5,6 +5,8 @@ from datetime import datetime as date_time
 from urllib.parse import urlparse
 import time
 from shutil import copyfile
+from flask_cors import CORS, cross_origin
+
 
 BASE_URL = 'http://localhost:5000'
 
@@ -23,12 +25,16 @@ __VIDEO_FOLDER = '_video'
 VIDEO_FOLDER = 'video'
 __VIDEO_UPLOAD_FOLDER = __VIDEO_FOLDER+'/'+UPLOAD_DIR
 VIDEO_UPLOAD_FOLDER = VIDEO_FOLDER+'/'+UPLOAD_DIR
-VIDEO_ALLOWED_EXTENSIONS = set(['mp4'])
+VIDEO_ALLOWED_EXTENSIONS = set(['mp4','mp3'])
 VIDEO_MAX_SIZE = 16 * 1024 * 1024;
 
 app = Flask(__name__)
 app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_UPLOAD_FOLDER
 app.config['VIDEO_UPLOAD_FOLDER'] = VIDEO_UPLOAD_FOLDER
+
+
+CORS(app, resources={r"/upload/*": {"origins": "*"}})
+#app.config['CORS_HEADERS'] = 'Content-Type'
 
 
 @app.route('/azura/<source>/<pathdir>/<filename>')
@@ -77,7 +83,11 @@ def folder_exit(folder):
 
 
 @app.route('/', methods=['GET', 'POST'])
-def upload_image():
+def home():
+    return "home page";
+
+@app.route('/upload/image/draft', methods=['POST', 'GET'])
+def upload_image_draft():
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
@@ -111,18 +121,50 @@ def upload_image():
             return jsonify(out), 200
             #return redirect(url_for('uploaded_image',filename=filename))
 
+    return "home"
 
-    return '''
-    <!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new File</h1>
-    <form method=post enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form>
-    '''
 
-@app.route('/video', methods=['GET', 'POST'])
+
+@app.route('/upload/image', methods=['POST', 'GET'])
+def upload_image():
+    if request.method == 'POST':
+        # check if the post request has the file part
+        if 'file' not in request.files:
+            out = {
+                'status': False,
+                'code': -1,
+                'message': 'No file part '
+                }
+            return jsonify(out),200
+        file = request.files['file']
+        # if user does not select file, browser also
+        # submit an empty part without filename
+        if file.filename == '':
+            out = {
+                'status': False,
+                'code': -2,
+                'message': 'No selected file '
+                }
+            return jsonify(out),200
+        if file and image_allowed_file(file.filename):
+            filename = str(MILLISECONDS) + '_'+ file.filename
+            filename = secure_filename(filename)
+            folder_exit(IMAGE_UPLOAD_FOLDER)
+            file.save(os.path.join(IMAGE_UPLOAD_FOLDER , filename)) 
+            out = {
+                'status': True,
+                'code': 200,
+                'url' :BASE_URL + url_for('show_source',source=IMAGE_FOLDER, pathdir=UPLOAD_DIR, filename=filename),
+                'message': ' success'
+                }
+            return jsonify(out), 200
+            #return redirect(url_for('uploaded_image',filename=filename))
+
+    return "home"
+
+
+
+@app.route('/upload/video', methods=['GET', 'POST'])
 def upload_video():
     if request.method == 'POST':
         # check if the post request has the file part
